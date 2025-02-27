@@ -1,0 +1,97 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scaling-nginx
+  namespace: scaling-nginx
+  
+spec:
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: myapp
+        image: nginx
+        resources:
+          limits:
+            memory: "10Mi"
+            cpu: "5m"
+          requests:
+            memory: "10Mi"
+            cpu: "5m"
+        ports:
+        - containerPort: 80
+
+#### Auto Scaling HorizontalPodAutoscaler ####
+# The HorizontalPodAutoscaler automatically scales the number of pods in a replication controller, deployment, replica set or stateful set based on observed CPU utilization (or, with custom metrics support, on some other application-provided metrics).
+# The HorizontalPodAutoscaler controller is part of the kube-controller-manager. The HorizontalPodAutoscaler controller periodically adjusts the number of replicas in a replication controller or deployment to match the observed average CPU utilization to the target specified by the user.
+# The HorizontalPodAutoscaler controller is implemented as a control loop that periodically queries the resource utilization against the metrics specified in each HorizontalPodAutoscaler definition. The controller then adjusts the number of replicas to match the target value.
+# The HorizontalPodAutoscaler controller supports scaling based on the following metrics:
+# - Resource metrics (such as those specified in the ResourceMetricsSource in the metrics.k8s.io API group)
+# - Custom metrics (such as those specified in the CustomMetricSource in the metrics.k8s.io API group)
+# - External metrics (such as those specified in the ExternalMetricSource in the metrics.k8s.io API group)
+# The HorizontalPodAutoscaler controller supports the following scaling algorithms:
+# - targetAverageValue: A target value for the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.
+# - targetAverageUtilization: A target value for the average of the resource metric across all relevant pods, represented as a percentage of the maximum value of the resource actually consumed by the pods.
+# - targetValue: A target value for the raw value of the resource metric to maintain.
+# The HorizontalPodAutoscaler controller supports the following scaling policies:
+# - Percent: Increase or decrease the current number of replicas by a percentage of the current number. The percentage is calculated based on the desired replicas.
+# - Pods: Increase or decrease the current number of replicas by a specified number of pods.
+# The HorizontalPodAutoscaler controller supports the following scaling behaviors:
+# - Scale-up stabilization: The HorizontalPodAutoscaler controller can be configured to wait for a period of time after the last scale-up event before considering another scale-up event. This can be used to prevent flapping of the number of replicas.
+# - Scale-down stabilization: The HorizontalPodAutoscaler controller can be configured to wait for a period of time after the last scale-down event before considering another scale-down event. This can be used to prevent flapping of the number of replicas.
+# - Scale-down non-stabilization: The HorizontalPodAutoscaler controller can be configured to scale down the number of replicas immediately after the last scale-down event.
+# The HorizontalPodAutoscaler controller supports the following scaling policies:
+# - Max: The HorizontalPodAutoscaler controller can be configured to select the maximum value of the desired replicas from all the policies.
+# - Min: The HorizontalPodAutoscaler controller can be configured to select the minimum value of the desired replicas from all the policies.
+# - MaxOrMin: The HorizontalPodAutoscaler controller can be configured to select the maximum or minimum value of the desired replicas from all the policies.
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: myapp
+  namespace: scaling-nginx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: scaling-nginx
+  minReplicas: 1
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 50
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 1
+        periodSeconds: 15
+      selectPolicy: Max
+
+
